@@ -23,6 +23,8 @@ double TauSVIV(IntegerVector sv, IntegerVector iv) {
   
   //See Christensen (2005)
   //c: concordant pairs, d: discordant pairs
+  //ex: "e_x" pairs where x value is the same (resulting in a 'streak' in the sorted vector sv, indicated by negative values in sv as explained above)
+  //ey: "e_y" pairs where y value is the same.
   
   long long ex = 0, ey = 0, c = 0, d = 0, n = 0;
   
@@ -31,7 +33,7 @@ double TauSVIV(IntegerVector sv, IntegerVector iv) {
   int maxy = iv[iv[0] - 1];
  
   //An array to keep track of how many times a value in IV has been encountered,
-  //to handle duplicate Y values.
+  //to handle duplicate Y values and increment e_y accordingly
   std::vector<int> yFreq (maxy, 0);
   
   //Fenwick tree
@@ -44,7 +46,11 @@ double TauSVIV(IntegerVector sv, IntegerVector iv) {
   //rxi: the rank of X[i] in X
   int ci = 0, fy = 0, di = 0, rxi = 0, yi = 0;
   
-  int i = 0;
+  int i = 0; //The position in sv, i.e. to iterate through the sorted vector sv. Note,
+  //iv is unsorted and goes in the same order as the original vector Y.
+  //Hence, the order of accessing values of iv will effectively be 'shuffled'
+  //in the loop below according to the sorting of sv so that the positions match
+  //up between X and Y
   
   //0 values in sv represent an NaN in vector X
   while (i < nx && sv[i] != 0) {
@@ -52,7 +58,7 @@ double TauSVIV(IntegerVector sv, IntegerVector iv) {
     rxi = sv[i];
     if (rxi > 0) {
       //Not a tie
-      yi = iv[rxi];
+      yi = iv[rxi]; //Recover the value in iv corresponding to the ith position in the sorted vector
       if (yi != 0) {
         
         ci = getSum(fw, yi - 1); fy = yFreq[yi - 1];
@@ -66,17 +72,22 @@ double TauSVIV(IntegerVector sv, IntegerVector iv) {
     }
     
     else {
-      
+      //rxi is negative, signaling a tie between X's values
+      //We know rxi isn't 0 because this possibility is eliminated in the while condition
       yi = iv[-rxi];
+     
       std::vector<int> localfreq (maxy, 0);
       std::vector<int> locallist (maxy, 0);
       int nlist = 0, nstreak = 0;
       bool streak = true;
       
       if (yi != 0) {
+        //Here, a streak begins (tie between X's values).
+        //There is no e_x yet, because it is the first x value of the streak
         locallist[0] = yi;
         localfreq[yi - 1] = 1;
         nlist++; nstreak++;
+        //Add concordant and discordant pairs, and e_y for the first pair (xi, yi) of the streak
         ci = getSum(fw, yi - 1); fy = yFreq[yi - 1]; di = n - ci - fy;
         c+= ci; d += di; ey += fy;
       }
@@ -108,6 +119,7 @@ double TauSVIV(IntegerVector sv, IntegerVector iv) {
         i++;
       }
       
+      //The streak of tied x values is now over.
       n += nstreak;
       int j = 0, nlistj = 0;
       while (j < nlist) {
@@ -142,7 +154,8 @@ int getSum(std::vector<int>& fenwick, int index) {
   
   while (index > 0) {
     sum += fenwick[index];
-    index -= (index & (-index));
+    index -= (index & (-index)); //The last index to be added is always a power of 2 (1, 2, 4, 8...)
+    //after a power of 2 it should be 0, thus exiting the loop
   }
   
   return sum;
